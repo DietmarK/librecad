@@ -1,0 +1,174 @@
+
+src/main/qc_applicationwindow.cpp:1523
+
+     recentFiles = new QG_RecentFiles(30);   /* 9 ---> 30 */
+
+this number should be modifiable by users, in LibreCAD.conf
+
+---------------------------------------------------------------------
+
+grid: closer gradation :
+
+i need it for my drafts, manipulating drawings for CAD-CAM
+
+
+src/lib/gui/rs_grid.cpp:176-191      modified:
+
+          // grid in finer gradation:  1  2  5   10  20  50  ...
+           
+           
+           double metagridfaktor_x = 5.0;
+           double metagridfaktor_y = 5.0;
+           
+           if (scaleGrid|| userGrid.x<=1e-6 || userGrid.y<=1e-6)
+             {
+                if(scaleGrid || userGrid.x<=1e-6)
+                  {
+                     while (graphicView->toGuiDX(gridWidth.x) < minGridSpacing)
+                       {
+                          if (graphicView->toGuiDX(gridWidth.x)  >=  minGridSpacing * 0.5 )
+                            {
+                               gridWidth.x  *= 2.0;
+                               metagridfaktor_x = 12.5;
+                            }
+                          else if (graphicView->toGuiDX(gridWidth.x)  >=  minGridSpacing * 0.2 )
+                            {
+                               gridWidth.x  *= 5.0;
+                               metagridfaktor_x = 10.0;
+                            }
+                          else
+                            {
+                               gridWidth.x *= 10;
+                               metagridfaktor_x = 10.0;
+                            }
+                            
+                            
+                       }    
+                  }
+                if(scaleGrid || userGrid.y<=1e-6)
+                  {
+                     while (graphicView->toGuiDY(gridWidth.y)<minGridSpacing)
+                       {
+                          if (graphicView->toGuiDX(gridWidth.y)  >=  minGridSpacing * 0.5 )
+                            {
+                               gridWidth.y  *= 2.0;
+                               metagridfaktor_y = 12.50;
+                            }
+                          else if (graphicView->toGuiDX(gridWidth.y)  >=  minGridSpacing * 0.2 )
+                            {
+                               gridWidth.y  *= 5.0;
+                               metagridfaktor_y = 10.0;
+                            }
+                          else
+                            {
+                               gridWidth.y   *= 10;
+                               metagridfaktor_y = 10.0;
+                            }
+                            
+                       }    
+                  }
+             }
+             
+           //std::cout << "metagridfaktor = "<< metagridfaktor << std::endl;
+           
+           
+           metaGridWidth.x = gridWidth.x * metagridfaktor_x;
+           metaGridWidth.y = gridWidth.y * metagridfaktor_y;
+           
+          // std::cout << "mgf= "<< metagridfaktor_x << "  x=" << gridWidth.x << "  mx=" << metaGridWidth.x << std::endl;
+
+-------
+
+my kind of setting metaGridWidth maybe not ideal, other people may think different....
+
+this behavior shuld be switchable in menu application settings or so.... :
+
+    src/lib/gui/rs_graphicview.h
+    src/lib/engine/rs_graphic.cpp
+    qg_dlgoptionsdrawing.cpp
+
+should be modified
+
+------------------------------------------------------
+
+in my plugin i need the direction of arc :
+
+ src/main/doc_plugin_interface.cpp:229   add a line:
+
+         data->insert(DPI::REVERSED, d.reversed );
+
+ src/plugins/document_interface.h:102   add a line:
+
+       , REVERSED=90,                  /* clockwise or not  */
+
+--------------------------------------------------
+
+add a new snap-function:
+
+ if i select one circle or one arc with angle > 267 degree then should be selected ALL equal elements
+ (with same radius and on same level).
+this behavior is helpfull for CAD-CAM, especially for bore hole patterns
+
+ I add this into "selectContour", someone could make an extra button in menu.
+
+src/lib/engine/rs_atomicentity.h:97  insert:
+
+     virtual double getRadius() const
+     {
+         return 0.0;
+     }
+    
+   virtual double getAngleLength() const
+     {
+        return 0.0;
+     }
+  
+----------
+
+src/lib/engine/rs_circle.h:143   "const"  was missing (in my older source, in the newest from git it was OK)
+
+     virtual double getRadius() const {
+        return data.radius;
+
+---------
+
+src/lib/modification/rs_selection.cpp:233   insert:
+
+      double r_clicked = 0;
+   RS_Layer* layer_clicked = 0;
+
+8 lines below (before "do { ..." )    insert:
+
+      if (ae->rtti()==RS2::EntityArc || ae->rtti()==RS2::EntityCircle)
+     {
+        r_clicked = ae->getRadius();
+
+        if (ae->getAngleLength() < 4.66)   /* ca. 267 degree */
+          r_clicked = 0;
+          
+        layer_clicked = ae->getLayer();
+     }
+
+14 lines below (before " // startpoint connects to 1st point "   insert:
+
+                    
+               double rc = ae->getRadius();
+               
+               double rdiff = fabs (rc - r_clicked);
+               
+               if ((r_clicked > 0.003)  &&  (0.003 > rdiff) && (ae->getLayer() == layer_clicked))
+                 doit = true;
+
+               
+---------------------------------------------------------
+
+
+2 plugins available for bore hole patterns and for milling contours:
+
+see plugins/cam?
+
+this two CAD-CAM -like modules help me by writing CNC-milling programms (this is my profession)
+
+they are in a very early alpha-stage, i'm working on it
+
+
